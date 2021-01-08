@@ -3,7 +3,7 @@
 --dce std
 --debug
 -D analyzer-optimize
-#-D hextclone
+-D hextclone
 -D hextclonejs
 -main Main
 -js wwwroot/client.js
