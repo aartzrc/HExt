@@ -18,10 +18,14 @@ class Main {
 		];
 
 #if hextclone
+		// This method serializes the htmlparser data and allows cloning/etc
+		// Template modification at run-time is possible and code size is generally smaller - this is the only method for server-side templates
 		buildByParser(people);
 #end
 
 #if hextclonejs
+		// This method 'flattens' the html into javascript element creation calls, very fast (no unserialize calls) but does not allow dynamic template changes
+		// Only available in JS output
 		buildByDOM(people);
 #end
 
@@ -35,18 +39,21 @@ class Main {
 		var userTable1 = HTMLTemplates.usertable.table.clone();
 
 		// Add rows to the instance
-		var rows:Array<hext.usertable.table.tbody.row.Row_Clone> = [];
-		for(p in people) {
+		var rows = people.map((p) -> {
 			var row = HTMLTemplates.usertable.table.tbody.row.clone();
 			row.firstname.innerHTML = p.fname;
 			row.lastname.innerHTML = p.lname;
 			row.age.innerHTML = Std.string(p.age);
 			userTable1.tbody.addChild(row);
-			rows.push(row);
-		}
+			return row;
+		});
 
 		#if php
 		// Server side templating, simply dump the htmlparser string out
+		Sys.print(userTable1.toString());
+
+		// Data can be modified
+		rows[0].firstname.innerHTML = "SOMEBODY ELSE";
 		Sys.print(userTable1.toString());
 		#end
 
@@ -64,9 +71,6 @@ class Main {
 		rows[0].firstname.innerHTML = "SOMEBODY ELSE";
 		// By using toElementMap during generation the hext names can be used to track down the actual instances
 		emap.map["firstname"][1].innerHTML = rows[0].firstname.innerHTML;
-
-		// Another 'empty' instance
-		document.body.appendChild(HExt.toElement(HTMLTemplates.usertable.table.clone()));
 		#end
 	}
 #end
@@ -81,13 +85,16 @@ class Main {
 		document.body.appendChild(userTable1._); // Add to DOM - we have direct pointers to all hext named elements, so future DOM edits are easy
 
 		// Add rows to the instance
-		for(p in people) {
+		var rows = people.map((p) -> {
 			var row = HTMLTemplates.usertable.table.tbody.row.cloneDOM();
 			row.firstname._.innerHTML = p.fname;
 			row.lastname._.innerHTML = p.lname;
 			row.age._.innerHTML = Std.string(p.age);
 			userTable1.tbody._.appendChild(row._);
-		}
+			return row;
+		});
+
+		rows[0].firstname._.innerHTML = "updated name!";
 	}
 #end
 }
