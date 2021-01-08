@@ -185,6 +185,7 @@ class HExtBuilder {
             var finalType = checkType(node.name);
             var createExpr:Expr = macro js.Browser.document.createElement($v{node.name});
             var assignExpr:Expr = {expr:ECast(createExpr, finalType), pos:Context.currentPos()};
+            var castExpr:Expr = {expr:ECast(macro $i{tempName}, finalType), pos:Context.currentPos()};
             var varExpr:Expr = {
                 pos:Context.currentPos(),
                 expr: EVars([{
@@ -201,12 +202,12 @@ class HExtBuilder {
             // curProps is null, this is the top-level node so always save it
             if(curProps == null) {
                 curProps = [];
-                curProps.push({field:"_",expr:assignExpr});
+                curProps.push({field:"_",expr:castExpr});
             } else {
                 // Check for a 'cloneChild' - this is a named child of the level above
                 var cloneChild = nodeExt.cloneChildren.find((c) -> c.node == node);
                 if(cloneChild != null) {
-                    var newProps:Array<ObjectField> = [ {field:"_",expr:assignExpr} ];
+                    var newProps:Array<ObjectField> = [ {field:"_",expr:castExpr} ];
                     curProps.push({field:cloneChild.name,expr:{expr:EObjectDecl(newProps), pos:Context.currentPos()}});
                     curProps = newProps; // Reset curProps so children get added properly
                     nodeExt = cloneChild; // Set the cloneChild to be the 'parent' of everything below it
