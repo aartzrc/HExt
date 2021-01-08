@@ -1,0 +1,9 @@
+-lib HtmlParser
+-cp src
+--dce std
+--debug
+-D analyzer-optimize
+#-D hextclone
+-D hextclonejs
+-main Main
+-js wwwroot/client.js

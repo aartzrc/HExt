@@ -1,0 +1,9 @@
+-lib HtmlParser
+-cp src
+--dce std
+--debug
+-D analyzer-optimize
+-D hextclone
+-main Main
+-D php-front=hext.php
+-php wwwroot
