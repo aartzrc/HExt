@@ -55,7 +55,7 @@ class HExtBuilder {
     }
     
     static function defineAbstract(childNode:HtmlNodeElementExt, curPack:Array<String>) {
-        curPack = curPack.concat([childNode.name]);
+        curPack = curPack.concat([cleanFieldName(childNode.name)]);
         var newAbstract:TypeDefinition = {
             pos:Context.currentPos(),
             pack:curPack,
@@ -216,7 +216,7 @@ class HExtBuilder {
                 var cloneChild = nodeExt.cloneChildren.find((c) -> c.node == node);
                 if(cloneChild != null) {
                     var newProps:Array<ObjectField> = [ {field:"_",expr:castExpr} ];
-                    curProps.push({field:cloneChild.name,expr:{expr:EObjectDecl(newProps), pos:Context.currentPos()}});
+                    curProps.push({field:cleanFieldName(cloneChild.name),expr:{expr:EObjectDecl(newProps), pos:Context.currentPos()}});
                     curProps = newProps; // Reset curProps so children get added properly
                     nodeExt = cloneChild; // Set the cloneChild to be the 'parent' of everything below it
                 }
@@ -293,13 +293,13 @@ class HExtBuilder {
     }
 
     static function cleanTypeName(name:String) {
-        name = name.replace(" ", "_");
+        name = name.replace(" ", "_").replace("-", "_");
         name = name.substr(0, 1).toUpperCase() + name.substr(1);
         return name;
     }
 
     static function cleanFieldName(name:String) {
-        name = name.replace(" ", "_").replace(".", "_");
+        name = name.replace(" ", "_").replace(".", "_").replace("-", "_");
         name = name.substr(0, 1).toLowerCase() + name.substr(1);
         return name;
     }
@@ -308,6 +308,7 @@ class HExtBuilder {
         return switch(type) {
             // TODO: automate this?
             case "div": TPath({pack:["js","html"], name:"DivElement"});
+            case "span": TPath({pack:["js","html"], name:"SpanElement"});
             case "table": TPath({pack:["js","html"], name:"TableElement"});
             case "tr": TPath({pack:["js","html"], name:"TableRowElement"});
             case "td": TPath({pack:["js","html"], name:"TableCellElement"});
