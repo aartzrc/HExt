@@ -12,11 +12,12 @@ import htmlparser.HtmlNodeText;
 #end
 
 class HExt {
-    public static inline var defaultAttrName = "hext";
-    public static inline var removeAttrName = "hext-remove";
+    public static inline var attr = "hext";
+    public static inline var removeAttr = "hext-remove";
+    public static inline var removeChildrenAttr = "hext-remove-children";
 
 #if hextclone
-    public static function findNode(node:HtmlNodeElement, nodeType:String, attrName:String = defaultAttrName) {
+    public static function findNode(node:HtmlNodeElement, nodeType:String, attrName:String = attr) {
         if(node != null) {
             if(node.hasAttribute(attrName) && node.getAttribute(attrName) == nodeType) return node;
             for(child in node.children) {
@@ -28,8 +29,8 @@ class HExt {
     }
 
     #if js
-    public static function toElement(node:HtmlNodeElement, elementMap:Map<String,Array<Element>> = null, attrName:String = defaultAttrName, ignoreAttrs:Array<String> = null):Element {
-        if(ignoreAttrs == null) ignoreAttrs = [ defaultAttrName, removeAttrName ];
+    public static function toElement(node:HtmlNodeElement, elementMap:Map<String,Array<Element>> = null, attrName:String = attr, ignoreAttrs:Array<String> = null):Element {
+        if(ignoreAttrs == null) ignoreAttrs = [ attr, removeAttr, removeChildrenAttr ];
         var element = document.createElement(node.name);
         if(elementMap != null && node.hasAttribute(attrName)) {
             var name = node.getAttribute(attrName);
@@ -48,7 +49,7 @@ class HExt {
         return element;
     }
 
-    public static function toElementMap(node:HtmlNodeElement, attrName:String = defaultAttrName, ignoreAttrs:Array<String> = null):{root:Element, map:Map<String,Array<Element>>} {
+    public static function toElementMap(node:HtmlNodeElement, attrName:String = attr, ignoreAttrs:Array<String> = null):{root:Element, map:Map<String,Array<Element>>} {
         var map:Map<String,Array<Element>> = [];
         return {root:toElement(node, map, attrName, ignoreAttrs), map:map};
     }

@@ -17,19 +17,19 @@ using StringTools;
 using Lambda;
 
 class HExtBuilder {
-    public static var removeChildren = [HExt.removeAttrName];
 
 	public static function addHTML(htmlPath:String):Array<Field> {
 		// get existing fields from the context from where build() is called
         var fields = Context.getBuildFields();
 		for(curFileName in FileSystem.readDirectory(htmlPath)) {
+            trace("Parsing template: " + Path.join([htmlPath, curFileName]));
 			var htmlStr = File.getContent(Path.join([htmlPath, curFileName]));
 
 			var fieldName = curFileName;
             if(fieldName.indexOf(".") != -1) fieldName = fieldName.substring(0, fieldName.indexOf("."));
             fieldName = cleanFieldName(fieldName);
 
-			// Recurse fields
+            // Recurse fields
             var elements = processChunk_HtmlParser(htmlStr);
             if(elements.length > 0) { // HExt elements found
                 // Create a dummy root node that matches the html file name
@@ -62,8 +62,10 @@ class HExtBuilder {
             name: cleanTypeName(childNode.name),
             kind: TDAbstract(macro:htmlparser.HtmlNodeElement, [macro:htmlparser.HtmlNodeElement], []),
             fields: [],
-            meta: [{pos:Context.currentPos(), name:":forward"}, {pos:Context.currentPos(), name:":keepSub"}]
+            meta: [{pos:Context.currentPos(), name:":forward"}]
         }
+
+        trace('Define: ${curPack.join(".")}');
 
         if(childNode.node != null) {
 #if hextclone
@@ -179,7 +181,7 @@ class HExtBuilder {
     }
 
     static function toDOMElements(node:HtmlNodeElementExt, ignoreAttrs:Array<String> = null):haxe.macro.Expr {
-        if(ignoreAttrs == null) ignoreAttrs = [ HExt.defaultAttrName, HExt.removeAttrName ];
+        if(ignoreAttrs == null) ignoreAttrs = [ HExt.attr, HExt.removeAttr, HExt.removeChildrenAttr ];
         var exprs:Array<Expr> = [];
         
         var elementCount = 0;
@@ -243,14 +245,13 @@ class HExtBuilder {
         return macro $b{exprs};
     }
 
-    static function processChunk_HtmlParser(chunk:String, attrName:String = HExt.defaultAttrName, removeChildrenAttrs:Array<String> = null):Array<HtmlNodeElementExt> {
-        if(removeChildrenAttrs == null) removeChildrenAttrs = removeChildren;
+    static function processChunk_HtmlParser(chunk:String):Array<HtmlNodeElementExt> {
         var htmlParsed = HtmlParser.run(chunk);
         var node:HtmlNodeElement = cast htmlParsed.find((n) -> Std.is(n, HtmlNodeElement));
-        return processElement_HtmlParser(node, attrName, removeChildrenAttrs);
+        return processElement_HtmlParser(node);
     }
 
-    static function processElement_HtmlParser(parent:HtmlNodeElement, attrName:String = HExt.defaultAttrName, removeChildrenAttrs:Array<String> = null, parentExt:HtmlNodeElementExt = null):Array<HtmlNodeElementExt> {
+    static function processElement_HtmlParser(parent:HtmlNodeElement, parentExt:HtmlNodeElementExt = null):Array<HtmlNodeElementExt> {
         var elements:Array<HtmlNodeElementExt> = [];
         if(parent != null) {
             // Clean whitespace
@@ -260,28 +261,30 @@ class HExtBuilder {
                     if(nt.text.trim().length == 0) nt.remove();
                 }
             }
-            if(removeChildrenAttrs == null) removeChildrenAttrs = removeChildren;
-            if(parent.hasAttribute(attrName)) {
-                parentExt = {name:parent.getAttribute(attrName), node:parent, children:[], cloneChildren:[]};
+            if(parent.hasAttribute(HExt.attr)) {
+                parentExt = {name:parent.getAttribute(HExt.attr), node:parent, children:[], cloneChildren:[]};
                 elements.push(parentExt);
             }
-            for(attr in removeChildrenAttrs) {
+            for(attr in [HExt.removeAttr]) {
                 if(parent.hasAttribute(attr)) {
                     parent.remove();
                 }
             }
             for(child in [ for(c in parent.children) c ]) { // Make a copy of children so if the children are removed the iterator won't fail
-                var childElements = processElement_HtmlParser(child, attrName, removeChildrenAttrs, parentExt);
+                var childElements = processElement_HtmlParser(child, parentExt);
                 if(parentExt != null) {
                     for(ce in childElements) {
                         parentExt.children.push(ce);
                         var cloneChild = true;
-                        for(attr in removeChildrenAttrs) if(ce.node.hasAttribute(attr)) cloneChild = false;
+                        for(attr in [HExt.removeAttr]) if(ce.node.hasAttribute(attr)) cloneChild = false;
                         if(cloneChild) parentExt.cloneChildren.push(ce);
                     }
                 } else {
                     for(ce in childElements) elements.push(ce);
                 }
+            }
+            if(parent.hasAttribute(HExt.removeChildrenAttr)) {
+                parent.nodes = [];
             }
         }
         return elements;
@@ -302,6 +305,7 @@ class HExtBuilder {
     static function checkType(type:String):ComplexType {
         return switch(type) {
             // TODO: automate this?
+            case "div": TPath({pack:["js","html"], name:"DivElement"});
             case "table": TPath({pack:["js","html"], name:"TableElement"});
             case "tr": TPath({pack:["js","html"], name:"TableRowElement"});
             case "td": TPath({pack:["js","html"], name:"TableCellElement"});
