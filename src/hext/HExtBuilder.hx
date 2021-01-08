@@ -97,6 +97,8 @@ class HExtBuilder {
         for(child in childNode.children) {
             var childAbstract = defineAbstract(child, curPack);
             var childType = TPath({pack:childAbstract.pack, name:childAbstract.name});
+
+#if hextclone
             // Static field that stores the 'template' node - this will be lazy created by the 'getter'
             var sVar:Field = {
                 pos:Context.currentPos(),
@@ -104,6 +106,10 @@ class HExtBuilder {
                 kind: FVar(childType, null), 
                 access: [AStatic, APrivate]
             }
+            newAbstract.fields.push(sVar);
+            Serializer.USE_CACHE = true;
+            var serializedNode = Serializer.run(child.node);
+#end
             // Property to access the 'template'
             var prop:Field = {
                 pos:Context.currentPos(),
@@ -111,19 +117,21 @@ class HExtBuilder {
                 kind: FProp("get","never",childType), 
                 access: [APublic]
             }
-            Serializer.USE_CACHE = true;
-            var serializedNode = Serializer.run(child.node);
+            
             // Property 'get' function which will lazy create the static instance from the serialized node
             var getFunc:Field = {
                 pos:Context.currentPos(),
                 name:"get_" + cleanFieldName(child.name),
                 kind: FFun({args:[], expr:macro {
+#if hextclone
                     if($i{sVar.name} == null) $i{sVar.name} = haxe.Unserializer.run($v{serializedNode});
                     return $i{sVar.name};
+#else
+                    return null;
+#end
                 },ret:childType}), 
                 access: [APrivate]
             }
-            newAbstract.fields.push(sVar);
             newAbstract.fields.push(prop);
             newAbstract.fields.push(getFunc);
         }

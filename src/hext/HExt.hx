@@ -1,6 +1,8 @@
 package hext;
 
+#if hextclone
 import htmlparser.HtmlNodeElement;
+#end
 using Lambda;
 
 #if js
@@ -13,6 +15,7 @@ class HExt {
     public static inline var defaultAttrName = "hext";
     public static inline var removeAttrName = "hext-remove";
 
+#if hextclone
     public static function findNode(node:HtmlNodeElement, nodeType:String, attrName:String = defaultAttrName) {
         if(node != null) {
             if(node.hasAttribute(attrName) && node.getAttribute(attrName) == nodeType) return node;
@@ -50,4 +53,5 @@ class HExt {
         return {root:toElement(node, map, attrName, ignoreAttrs), map:map};
     }
     #end
+#end
 }
