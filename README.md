@@ -7,6 +7,9 @@ For example, an html mockup is created of the page and you want to incorporate i
 Add the html to the 'htmltemplates' folder and use the `hext` attributes to tell the system which pieces you want direct access to. 
 The macro that runs on the `HTMLTemplates` class will convert the html into cloneable template nodes for use with the HTMLParser library (`-D hextclone` build define), or directly into Javascript DOM createElement calls (`-D hextclonejs` build define).  
 
+See `src/Main.hx` for client and server output examples.  
+
+### Example
 The HTML file 'usertable.htm':
 ```html
 <table style="width:100%" hext="table">
