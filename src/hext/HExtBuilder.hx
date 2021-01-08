@@ -181,6 +181,18 @@ class HExtBuilder {
             // Create this element
             var tempName = 't$elementCount';
             elementCount++;
+            // Build Haxe js.html type to help with code completion
+            var finalType = checkType(node.name);
+            var createExpr:Expr = macro js.Browser.document.createElement($v{node.name});
+            var assignExpr:Expr = {expr:ECast(createExpr, finalType), pos:Context.currentPos()};
+            var varExpr:Expr = {
+                pos:Context.currentPos(),
+                expr: EVars([{
+                    type:finalType,
+                    name:tempName,
+                    expr:assignExpr
+                }])
+            };
             exprs.push(macro var $tempName = js.Browser.document.createElement($v{node.name}));
             for(attr in node.attributes.filter((a) -> ignoreAttrs.indexOf(a.name) == -1)) {
                 exprs.push(macro $i{tempName}.setAttribute($v{attr.name}, $v{attr.value}));
@@ -189,12 +201,12 @@ class HExtBuilder {
             // curProps is null, this is the top-level node so always save it
             if(curProps == null) {
                 curProps = [];
-                curProps.push({field:"_",expr:macro $i{tempName}});
+                curProps.push({field:"_",expr:assignExpr});
             } else {
                 // Check for a 'cloneChild' - this is a named child of the level above
                 var cloneChild = nodeExt.cloneChildren.find((c) -> c.node == node);
                 if(cloneChild != null) {
-                    var newProps:Array<ObjectField> = [ {field:"_",expr:macro $i{tempName}} ];
+                    var newProps:Array<ObjectField> = [ {field:"_",expr:assignExpr} ];
                     curProps.push({field:cloneChild.name,expr:{expr:EObjectDecl(newProps), pos:Context.currentPos()}});
                     curProps = newProps; // Reset curProps so children get added properly
                     nodeExt = cloneChild; // Set the cloneChild to be the 'parent' of everything below it
@@ -276,6 +288,16 @@ class HExtBuilder {
         name = name.replace(" ", "_").replace(".", "_");
         name = name.substr(0, 1).toLowerCase() + name.substr(1);
         return name;
+    }
+
+    static function checkType(type:String):ComplexType {
+        return switch(type) {
+            // TODO: automate this?
+            case "table": TPath({pack:["js","html"], name:"TableElement"});
+            case "tr": TPath({pack:["js","html"], name:"TableRowElement"});
+            case "td": TPath({pack:["js","html"], name:"TableCellElement"});
+            case _: TPath({pack:["js","html"], name:"Element"});
+        }
     }
 }
 

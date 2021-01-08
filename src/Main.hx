@@ -1,10 +1,7 @@
-import haxe.Serializer;
-import haxe.Unserializer;
 import hext.HExt;
 
 #if js
 import js.Browser.document;
-import js.html.Element;
 #end
 
 class Main {
