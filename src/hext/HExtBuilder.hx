@@ -88,7 +88,7 @@ class HExtBuilder {
             var cloneDOM:Field = {
                 pos:Context.currentPos(),
                 name:"cloneDOM",
-                kind: FFun({args:[], expr:toDOMElements(childNode),ret:null}), 
+                kind: FFun({args:[{type:macro:js.html.Element,opt:true,name:"parent"}], expr:toDOMElements(childNode),ret:null}), 
                 access: [APublic]
             }
             newAbstract.fields.push(cloneDOM);
@@ -185,9 +185,7 @@ class HExtBuilder {
         var exprs:Array<Expr> = [];
         
         var elementCount = 0;
-        function recurseChildren(nodeExt:HtmlNodeElementExt, node:HtmlNodeElement = null, parentVar:String = null, curProps:Array<ObjectField> = null) {
-            if(node == null) node = nodeExt.node;
-
+        function recurseChildren(nodeExt:HtmlNodeElementExt, node:HtmlNodeElement, parentVar:String = null, curProps:Array<ObjectField> = null) {
             // Create this element
             var tempName = 't$elementCount';
             elementCount++;
@@ -225,7 +223,11 @@ class HExtBuilder {
             }
 
             // If there's a parent element, appendChild
-            if(parentVar != null) exprs.push(macro $i{parentVar}.appendChild($i{tempName}));
+            if(parentVar != null) {
+                exprs.push(macro $i{parentVar}.appendChild($i{tempName}));
+            } else {
+                exprs.push(macro if($i{"parent"} != null) $i{"parent"}.appendChild($i{tempName}));
+            }
 
             // Add children
             for(c in node.nodes) {
@@ -238,7 +240,7 @@ class HExtBuilder {
             }
             return curProps;
         }
-        var outProps = recurseChildren(node);
+        var outProps = recurseChildren(node, node.node);
         var outExp:Expr = {expr:EObjectDecl(outProps), pos:Context.currentPos()};
         var retExp:Expr = {expr:EReturn(outExp), pos:Context.currentPos()};
         exprs.push(retExp);

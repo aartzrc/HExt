@@ -78,16 +78,14 @@ class Main {
 		// Changes to the template are NOT reflected in the cloneDOM output!
 
 		// Create an instance of the table template
-		var userTable1 = HTMLTemplates.usertable.table.cloneDOM();
-		document.body.appendChild(userTable1._); // Add to DOM - we have direct pointers to all hext named elements, so future DOM edits are easy
+		var userTable1 = HTMLTemplates.usertable.table.cloneDOM(document.body); // Add to DOM - we have direct pointers to all hext named elements, so future DOM edits are easy
 
 		// Add rows to the instance
 		var rows = people.map((p) -> {
-			var row = HTMLTemplates.usertable.table.tbody.row.cloneDOM();
+			var row = HTMLTemplates.usertable.table.tbody.row.cloneDOM(userTable1.tbody._);
 			row.firstname._.innerHTML = p.fname;
 			row.lastname._.innerHTML = p.lname;
 			row.age._.innerHTML = Std.string(p.age);
-			userTable1.tbody._.appendChild(row._);
 			return row;
 		});
 
