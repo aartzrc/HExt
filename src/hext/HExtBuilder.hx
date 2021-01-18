@@ -22,22 +22,24 @@ class HExtBuilder {
 		// get existing fields from the context from where build() is called
         var fields = Context.getBuildFields();
 		for(curFileName in FileSystem.readDirectory(htmlPath)) {
-            trace("Parsing template: " + Path.join([htmlPath, curFileName]));
-			var htmlStr = File.getContent(Path.join([htmlPath, curFileName]));
+            //trace("Parsing template: " + Path.join([htmlPath, curFileName]));
+            var path = Path.join([htmlPath, curFileName]);
+			var htmlStr = File.getContent(path);
 
 			var fieldName = curFileName;
             if(fieldName.indexOf(".") != -1) fieldName = fieldName.substring(0, fieldName.indexOf("."));
             fieldName = cleanFieldName(fieldName);
 
             // Recurse fields
-            var elements = processChunk_HtmlParser(htmlStr);
+            var elements = processChunk_HtmlParser({path:path, chunk:htmlStr});
             if(elements.length > 0) { // HExt elements found
                 // Create a dummy root node that matches the html file name
                 var node:HtmlNodeElementExt = {
                     name:fieldName,
                     children:elements,
                     node:null,
-                    cloneChildren:elements
+                    cloneChildren:elements,
+                    pos:{min:0, max:htmlStr.length, file:Path.join([htmlPath, curFileName])}
                 };
                 // defineAbstract will recursively create 'wrappers' around the HtmlNodeElement data
                 var rootAbstract = defineAbstract(node, ["hext"]);
@@ -45,7 +47,7 @@ class HExtBuilder {
                     name: fieldName,
                     access: [Access.APublic, Access.AStatic],
                     kind: FVar(TPath({pack:rootAbstract.pack, name:rootAbstract.name}), null), 
-                    pos: Context.currentPos(),
+                    pos: Context.makePosition(node.pos),
                 };
                 fields.push(rootField);
             }
@@ -57,7 +59,7 @@ class HExtBuilder {
     static function defineAbstract(childNode:HtmlNodeElementExt, curPack:Array<String>) {
         curPack = curPack.concat([cleanFieldName(childNode.name)]);
         var newAbstract:TypeDefinition = {
-            pos:Context.currentPos(),
+            pos:Context.makePosition(childNode.pos),
             pack:curPack,
             name: cleanTypeName(childNode.name),
             kind: TDAbstract(macro:htmlparser.HtmlNodeElement, [macro:htmlparser.HtmlNodeElement], []),
@@ -65,14 +67,14 @@ class HExtBuilder {
             meta: [{pos:Context.currentPos(), name:":forward"}]
         }
 
-        trace('Define: ${curPack.join(".")}');
+        //trace('Define: ${curPack.join(".")}');
 
         if(childNode.node != null) {
 #if hextclone
             // Create 'clone' method and abstract
             var cloneAbstract = defineAbstract_Clone(childNode, curPack);
             var clone:Field = {
-                pos:Context.currentPos(),
+                pos:Context.makePosition(childNode.pos),
                 name:"clone",
                 kind: FFun({args:[], expr:macro {
                     haxe.Serializer.USE_CACHE = true;
@@ -86,7 +88,7 @@ class HExtBuilder {
 #if hextclonejs
             // Create 'cloneDOM' method
             var cloneDOM:Field = {
-                pos:Context.currentPos(),
+                pos:Context.makePosition(childNode.pos),
                 name:"cloneDOM",
                 kind: FFun({args:[{type:macro:js.html.Element,opt:true,name:"parent"}], expr:toDOMElements(childNode),ret:null}), 
                 access: [APublic]
@@ -103,7 +105,7 @@ class HExtBuilder {
 #if hextclone
             // Static field that stores the 'template' node - this will be lazy created by the 'getter'
             var sVar:Field = {
-                pos:Context.currentPos(),
+                pos:Context.makePosition(childNode.pos),
                 name:"_" + cleanFieldName(child.name),
                 kind: FVar(childType, null), 
                 access: [AStatic, APrivate]
@@ -114,7 +116,7 @@ class HExtBuilder {
 #end
             // Property to access the 'template'
             var prop:Field = {
-                pos:Context.currentPos(),
+                pos:Context.makePosition(childNode.pos),
                 name:cleanFieldName(child.name),
                 kind: FProp("get","never",childType), 
                 access: [APublic]
@@ -122,7 +124,7 @@ class HExtBuilder {
             
             // Property 'get' function which will lazy create the static instance from the serialized node
             var getFunc:Field = {
-                pos:Context.currentPos(),
+                pos:Context.makePosition(childNode.pos),
                 name:"get_" + cleanFieldName(child.name),
                 kind: FFun({args:[], expr:macro {
 #if hextclone
@@ -145,7 +147,7 @@ class HExtBuilder {
 
     static function defineAbstract_Clone(childNode:HtmlNodeElementExt, curPack:Array<String>) {
         var newAbstract:TypeDefinition = {
-            pos:Context.currentPos(),
+            pos:Context.makePosition(childNode.pos),
             pack:curPack,
             name: cleanTypeName(childNode.name) + "_Clone",
             kind: TDAbstract(macro:htmlparser.HtmlNodeElement, [macro:htmlparser.HtmlNodeElement], [macro:htmlparser.HtmlNodeElement]),
@@ -158,13 +160,13 @@ class HExtBuilder {
             var cloneChildType = TPath({pack:curPack.concat([cloneChild.name]), name:cleanTypeName(cloneChild.name) + "_Clone"});
             // Property to access the cloned child
             var prop:Field = {
-                pos:Context.currentPos(),
+                pos:Context.makePosition(childNode.pos),
                 name:cleanFieldName(cloneChild.name),
                 kind: FProp("get","never",cloneChildType), 
                 access: [APublic]
             }
             var getFunc:Field = {
-                pos:Context.currentPos(),
+                pos:Context.makePosition(childNode.pos),
                 name:"get_" + cleanFieldName(cloneChild.name),
                 kind: FFun({args:[], expr:macro {
                     return hext.HExt.findNode(this, $v{cloneChild.name});
@@ -189,13 +191,14 @@ class HExtBuilder {
             // Create this element
             var tempName = 't$elementCount';
             elementCount++;
+            var pos = Context.makePosition(nodeExt.pos);
             // Build Haxe js.html type to help with code completion
             var finalType = checkType(node.name);
             var createExpr:Expr = macro js.Browser.document.createElement($v{node.name});
-            var assignExpr:Expr = {expr:ECast(createExpr, finalType), pos:Context.currentPos()};
-            var castExpr:Expr = {expr:ECast(macro $i{tempName}, finalType), pos:Context.currentPos()};
+            var assignExpr:Expr = {expr:ECast(createExpr, finalType), pos:pos};
+            var castExpr:Expr = {expr:ECast(macro $i{tempName}, finalType), pos:pos};
             var varExpr:Expr = {
-                pos:Context.currentPos(),
+                pos:pos,
                 expr: EVars([{
                     type:finalType,
                     name:tempName,
@@ -216,7 +219,7 @@ class HExtBuilder {
                 var cloneChild = nodeExt.cloneChildren.find((c) -> c.node == node);
                 if(cloneChild != null) {
                     var newProps:Array<ObjectField> = [ {field:"_",expr:castExpr} ];
-                    curProps.push({field:cleanFieldName(cloneChild.name),expr:{expr:EObjectDecl(newProps), pos:Context.currentPos()}});
+                    curProps.push({field:cleanFieldName(cloneChild.name),expr:{expr:EObjectDecl(newProps), pos:pos}});
                     curProps = newProps; // Reset curProps so children get added properly
                     nodeExt = cloneChild; // Set the cloneChild to be the 'parent' of everything below it
                 }
@@ -240,20 +243,21 @@ class HExtBuilder {
             }
             return curProps;
         }
+        var pos = Context.makePosition(node.pos);
         var outProps = recurseChildren(node, node.node);
-        var outExp:Expr = {expr:EObjectDecl(outProps), pos:Context.currentPos()};
-        var retExp:Expr = {expr:EReturn(outExp), pos:Context.currentPos()};
+        var outExp:Expr = {expr:EObjectDecl(outProps), pos:pos};
+        var retExp:Expr = {expr:EReturn(outExp), pos:pos};
         exprs.push(retExp);
         return macro $b{exprs};
     }
 
-    static function processChunk_HtmlParser(chunk:String):Array<HtmlNodeElementExt> {
-        var htmlParsed = HtmlParser.run(chunk);
+    static function processChunk_HtmlParser(vals:{chunk:String, path:String}):Array<HtmlNodeElementExt> {
+        var htmlParsed = HtmlParser.run(vals.chunk);
         var node:HtmlNodeElement = cast htmlParsed.find((n) -> Std.is(n, HtmlNodeElement));
-        return processElement_HtmlParser(node);
+        return processElement_HtmlParser(vals, node);
     }
 
-    static function processElement_HtmlParser(parent:HtmlNodeElement, parentExt:HtmlNodeElementExt = null):Array<HtmlNodeElementExt> {
+    static function processElement_HtmlParser(vals:{chunk:String, path:String}, parent:HtmlNodeElement, parentExt:HtmlNodeElementExt = null):Array<HtmlNodeElementExt> {
         var elements:Array<HtmlNodeElementExt> = [];
         if(parent != null) {
             // Clean whitespace
@@ -264,7 +268,9 @@ class HExtBuilder {
                 }
             }
             if(parent.hasAttribute(HExt.attr)) {
-                parentExt = {name:parent.getAttribute(HExt.attr), node:parent, children:[], cloneChildren:[]};
+                var name = parent.getAttribute(HExt.attr);
+                var min = vals.chunk.indexOf('"$name"');
+                parentExt = {name:parent.getAttribute(HExt.attr), node:parent, children:[], cloneChildren:[], pos:{file:vals.path, min:min, max:min+name.length}};
                 elements.push(parentExt);
             }
             for(attr in [HExt.removeAttr]) {
@@ -273,7 +279,7 @@ class HExtBuilder {
                 }
             }
             for(child in [ for(c in parent.children) c ]) { // Make a copy of children so if the children are removed the iterator won't fail
-                var childElements = processElement_HtmlParser(child, parentExt);
+                var childElements = processElement_HtmlParser(vals, child, parentExt);
                 if(parentExt != null) {
                     for(ce in childElements) {
                         parentExt.children.push(ce);
@@ -312,6 +318,8 @@ class HExtBuilder {
             case "table": TPath({pack:["js","html"], name:"TableElement"});
             case "tr": TPath({pack:["js","html"], name:"TableRowElement"});
             case "td": TPath({pack:["js","html"], name:"TableCellElement"});
+            case "input": TPath({pack:["js","html"], name:"InputElement"});
+            case "textarea": TPath({pack:["js","html"], name:"TextAreaElement"});
             case _: TPath({pack:["js","html"], name:"Element"});
         }
     }
@@ -321,7 +329,8 @@ typedef HtmlNodeElementExt = {
     name:String,
     node:HtmlNodeElement, // Raw node template - this may have children removed/etc based on hext-remove attribute
     children:Array<HtmlNodeElementExt>, // Child list of hext named elements
-    cloneChildren:Array<HtmlNodeElementExt> // Child list of hext elements that do not have hext-remove attribute
+    cloneChildren:Array<HtmlNodeElementExt>, // Child list of hext elements that do not have hext-remove attribute
+    pos: {min:Int, max:Int, file:String}
 }
 
 #end
